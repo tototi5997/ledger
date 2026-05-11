@@ -167,4 +167,5 @@ function revalidateFundingSourcePages() {
   revalidatePath("/settings")
   revalidatePath("/settings/funding-sources")
   revalidatePath("/transactions/new")
+  revalidatePath("/analytics")
 }

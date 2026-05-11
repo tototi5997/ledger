@@ -77,9 +77,14 @@ export default async function HomePage() {
     <main className="min-h-dvh bg-[#f7f7f4] px-4 py-6 text-foreground">
       <section className="mx-auto flex w-full max-w-5xl flex-col gap-8">
         <header className="flex items-center justify-between">
-          <Link href="/settings" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
-            设置
-          </Link>
+          <nav className="flex items-center gap-4 text-sm text-muted-foreground">
+            <Link href="/analytics" className="underline-offset-4 hover:underline">
+              统计
+            </Link>
+            <Link href="/settings" className="underline-offset-4 hover:underline">
+              设置
+            </Link>
+          </nav>
           <Link className={buttonVariants()} href="/transactions/new">
             新增记账
           </Link>

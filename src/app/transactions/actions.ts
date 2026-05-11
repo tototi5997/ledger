@@ -64,6 +64,7 @@ export async function createTransactionAction(
 
   revalidatePath("/")
   revalidatePath("/transactions")
+  revalidatePath("/analytics")
   redirect("/transactions")
 }
 
@@ -123,6 +124,7 @@ export async function updateTransactionAction(
 
   revalidatePath("/")
   revalidatePath("/transactions")
+  revalidatePath("/analytics")
   redirect("/transactions")
 }
 
@@ -153,6 +155,7 @@ export async function deleteTransactionAction(
 
   revalidatePath("/")
   revalidatePath("/transactions")
+  revalidatePath("/analytics")
   redirect("/transactions")
 }
 

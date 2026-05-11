@@ -258,4 +258,5 @@ function revalidateCategoryTagPages() {
   revalidatePath("/transactions/new")
   revalidatePath("/transactions")
   revalidatePath("/")
+  revalidatePath("/analytics")
 }
