@@ -44,12 +44,15 @@ MVP 不支持：
 
 - `docs/PRODUCT_REQUIREMENTS.md`
 - `docs/TECHNICAL_DESIGN.md`
+- `docs/PROJECT_PROGRESS.md`
 
 编写或修改界面前，应先阅读：
 
 - `DESIGN.md`
 
 如果实现需要偏离上述文档，必须在同一次变更中更新对应文档，避免代码和文档脱节。
+
+每完成一个任务，都必须更新 `docs/PROJECT_PROGRESS.md`，记录完成内容、验证结果和下一步建议。
 
 ## 技术栈
 

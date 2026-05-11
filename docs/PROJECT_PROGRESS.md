@@ -1,0 +1,158 @@
+# 项目进度记录
+
+本文件用于跨对话延续开发上下文。每完成一个任务，都必须更新本文件，记录完成内容、验证结果和下一步建议。
+
+## 当前状态
+
+- 当前分支：`main`。
+- GitHub remote：`git@github.com:tototi5997/ledger.git`。
+- 最新已推送提交：`36c5cad 实现个人记账 MVP 基础功能`。
+- 本地工作区：提交后为干净状态。
+- 当前认证方案：邮箱 + 密码。
+- 当前 Supabase 项目 URL：`https://edyzepnecvijedjcoxpv.supabase.co`。
+- `.env.local` 已配置本地 Supabase 环境变量，且被 `.gitignore` 忽略。
+
+## 已完成内容
+
+### 文档
+
+- 已完成产品文档：`docs/PRODUCT_REQUIREMENTS.md`。
+- 已完成技术开发文档：`docs/TECHNICAL_DESIGN.md`。
+- 已生成设计参考文档：`DESIGN.md`。
+- 已将项目协作规则中文化：`AGENTS.md`。
+- 已新增本进度文档：`docs/PROJECT_PROGRESS.md`。
+
+### 项目基础
+
+- 已初始化 Next.js App Router + TypeScript + Tailwind CSS 项目。
+- 已使用 pnpm 作为包管理器。
+- 已初始化 shadcn/ui，并生成基础 `Button` 组件。
+- 已移除 Google Fonts 构建依赖，避免构建时访问外部字体服务。
+- 已配置 Supabase SSR/browser client。
+- 已按 Next.js 16 使用 `src/proxy.ts` 做会话保护。
+
+### 认证
+
+- 已实现邮箱 + 密码注册。
+- 已实现邮箱 + 密码登录。
+- 已实现退出登录的 Server Action，但设置页尚未接入退出按钮。
+- 注册或登录后会幂等初始化用户空间。
+
+### 数据库与 RLS
+
+已创建 Supabase migration：
+
+- `supabase/migrations/202605100001_initial_schema.sql`
+- `supabase/migrations/202605100002_profiles_email.sql`
+- `supabase/migrations/202605100003_funding_sources_delete_policy.sql`
+- `supabase/migrations/202605110001_category_tags_delete_policy.sql`
+
+核心表：
+
+- `profiles`
+- `ledgers`
+- `funding_sources`
+- `category_tags`
+- `transactions`
+
+当前规则：
+
+- 每个用户一个默认账本。
+- 资金渠道和分类标签按账本隔离。
+- 交易删除使用 `deleted_at` 软删除。
+- RLS 限制用户只能访问自己的账本数据。
+- 资金渠道未被交易使用时可删除；已被交易使用时只能隐藏。
+- 分类标签删除时，相关交易会迁移到同类型“其他”标签，再删除原标签。
+
+注意：如果远端 Supabase 尚未执行最新 migration，需要手动在 SQL Editor 中执行。
+
+### 记账功能
+
+- 已实现新增交易页：`/transactions/new`。
+- 新增交易字段顺序：类型、资金渠道、金额、分类标签、日期、备注。
+- 金额输入已限制为数字和小数点，最多两位小数。
+- 已实现编辑交易页：`/transactions/[id]/edit`。
+- 编辑交易时可修改：收入/支出、资金渠道、金额、分类标签、日期、备注。
+- 编辑历史交易时，如果当前使用的资金渠道或分类标签已隐藏，仍可显示并保留。
+- 已实现交易软删除。
+- 删除交易前有二次确认，移动端为底部弹层，桌面端为居中模态框。
+
+### 交易列表
+
+- 已实现交易列表页：`/transactions`。
+- 首屏加载 50 条交易。
+- 点击“加载更多”继续分页加载。
+- 交易列表展示日期；有备注时展示为 `日期 · 备注`。
+- 交易列表项默认不常驻展示编辑/删除按钮。
+- 交易列表项支持向左滑动，露出“编辑”和“删除”操作区。
+
+### 首页
+
+- 已实现首页基础统计：
+  - 本月收入。
+  - 本月支出。
+  - 本月结余。
+- 已实现首页最近交易。
+- 首页保留“设置”和“新增记账”入口。
+
+### 资金渠道管理
+
+- 已实现设置页入口：`/settings`。
+- 已实现资金渠道管理页：`/settings/funding-sources`。
+- 支持新增、编辑、隐藏、删除资金渠道。
+- 删除资金渠道前会检查是否有交易引用。
+- 已被交易使用的资金渠道不能删除，只能隐藏。
+- 删除操作有二次确认。
+
+### 分类标签管理
+
+- 已实现分类标签管理页：`/settings/category-tags`。
+- 支持按“收入标签 / 支出标签”筛选展示。
+- 默认展示收入标签。
+- 支持新增、编辑、隐藏、删除分类标签。
+- 删除已被使用的分类标签时，相关交易迁移到同类型“其他”标签。
+- 删除操作有二次确认。
+
+## 最近验证结果
+
+以下命令已通过：
+
+```bash
+pnpm lint
+pnpm exec tsc --noEmit
+pnpm build
+```
+
+最近一次构建包含以下路由：
+
+- `/`
+- `/login`
+- `/settings`
+- `/settings/category-tags`
+- `/settings/funding-sources`
+- `/transactions`
+- `/transactions/[id]/edit`
+- `/transactions/new`
+
+## 未完成事项
+
+建议后续优先级：
+
+1. 实现统计页 `/analytics`。
+2. 在设置页接入退出登录按钮。
+3. 实现交易列表筛选：月份、收入/支出、资金渠道、分类标签。
+4. 实现 PWA 配置：manifest、图标、主题色、弱网提示。
+5. 配置 Vercel 部署与生产环境变量。
+6. 执行生产 Supabase migration 并完成部署验收。
+7. 根据需要优化交易列表滑动交互，例如点击其他项自动收起。
+
+## 下次对话建议开场
+
+可以直接说明：
+
+> 请阅读 `docs/PROJECT_PROGRESS.md`、`docs/PRODUCT_REQUIREMENTS.md`、`docs/TECHNICAL_DESIGN.md` 和 `AGENTS.md`，继续开发未完成事项。
+
+如果继续按优先级推进，建议下一步实现：
+
+- 统计页 `/analytics`。
+
