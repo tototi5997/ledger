@@ -11,3 +11,11 @@ export type TransactionRow = {
     name: string
   } | null
 }
+
+export type TransactionFilters = {
+  year?: number
+  month?: number
+  type?: "expense" | "income"
+  fundingSourceId?: string
+  categoryTagId?: string
+}

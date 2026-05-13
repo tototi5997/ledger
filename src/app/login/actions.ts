@@ -75,10 +75,13 @@ export async function registerAction(
   redirect("/")
 }
 
-export async function signOutAction() {
+export async function signOutAction(): Promise<AuthActionState> {
   const supabase = await createSupabaseServerClient()
+  const { error } = await supabase.auth.signOut()
 
-  await supabase.auth.signOut()
+  if (error) {
+    return { message: error.message || "退出失败，请稍后重试" }
+  }
 
   redirect("/login")
 }

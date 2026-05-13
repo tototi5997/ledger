@@ -1,13 +1,36 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
-
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
+import { PwaClient } from "@/app/pwa-client";
 
 export const metadata: Metadata = {
   title: "Ledger",
-  description: "Personal daily ledger",
+  description: "个人日常记账应用",
+  applicationName: "Ledger",
+  appleWebApp: {
+    capable: true,
+    title: "Ledger",
+    statusBarStyle: "default",
+  },
+  icons: {
+    icon: [
+      {
+        url: "/icons/ledger-icon-192.svg",
+        sizes: "192x192",
+        type: "image/svg+xml",
+      },
+      {
+        url: "/icons/ledger-icon-512.svg",
+        sizes: "512x512",
+        type: "image/svg+xml",
+      },
+    ],
+    apple: "/icons/ledger-icon-192.svg",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#26251e",
 };
 
 export default function RootLayout({
@@ -16,8 +39,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN" className={cn("h-full antialiased", "font-sans", geist.variable)}>
-      <body className="min-h-full flex flex-col">{children}</body>
+    <html lang="zh-CN" className={cn("h-full antialiased", "font-sans")}>
+      <body className="min-h-full flex flex-col">
+        <PwaClient />
+        {children}
+      </body>
     </html>
   );
 }

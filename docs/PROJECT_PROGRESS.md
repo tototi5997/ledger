@@ -6,8 +6,8 @@
 
 - 当前分支：`main`。
 - GitHub remote：`git@github.com:tototi5997/ledger.git`。
-- 最新已推送提交：`36c5cad 实现个人记账 MVP 基础功能`。
-- 本地工作区：提交后为干净状态。
+- 最新已推送提交：`704e8ef 实现统计页`。
+- 本地工作区：有未提交的设置页退出登录按钮、交易列表筛选和 PWA 配置改动。
 - 当前认证方案：邮箱 + 密码。
 - 当前 Supabase 项目 URL：`https://edyzepnecvijedjcoxpv.supabase.co`。
 - `.env.local` 已配置本地 Supabase 环境变量，且被 `.gitignore` 忽略。
@@ -28,7 +28,7 @@
 - 已初始化 Next.js App Router + TypeScript + Tailwind CSS 项目。
 - 已使用 pnpm 作为包管理器。
 - 已初始化 shadcn/ui，并生成基础 `Button` 组件。
-- 已移除 Google Fonts 构建依赖，避免构建时访问外部字体服务。
+- 已移除 Google Fonts 构建和运行时依赖，避免访问外部字体服务。
 - 已配置 Supabase SSR/browser client。
 - 已按 Next.js 16 使用 `src/proxy.ts` 做会话保护。
 
@@ -36,7 +36,10 @@
 
 - 已实现邮箱 + 密码注册。
 - 已实现邮箱 + 密码登录。
-- 已实现退出登录的 Server Action，但设置页尚未接入退出按钮。
+- 已实现退出登录的 Server Action。
+- 已在设置页接入退出登录按钮。
+- 退出登录前有二次确认，移动端为底部弹层，桌面端为居中模态框。
+- 退出成功后跳转到 `/login`。
 - 注册或登录后会幂等初始化用户空间。
 
 ### 数据库与 RLS
@@ -83,6 +86,13 @@
 - 已实现交易列表页：`/transactions`。
 - 首屏加载 50 条交易。
 - 点击“加载更多”继续分页加载。
+- 支持按年份、月份、收入/支出、资金渠道和分类标签筛选。
+- 默认展示全部交易，不带筛选条件。
+- 筛选状态使用 URL query 参数保存。
+- 筛选后点击“加载更多”会按相同筛选条件继续分页。
+- 筛选入口位于交易列表头部，筛选控件在弹窗中展示。
+- 筛选弹窗移动端为底部弹层，桌面端为居中模态框。
+- 交易筛选不支持关键词搜索。
 - 交易列表展示日期；有备注时展示为 `日期 · 备注`。
 - 交易列表项默认不常驻展示编辑/删除按钮。
 - 交易列表项支持向左滑动，露出“编辑”和“删除”操作区。
@@ -124,6 +134,19 @@
 - 删除已被使用的分类标签时，相关交易迁移到同类型“其他”标签。
 - 删除操作有二次确认。
 
+### PWA
+
+- 已实现 `src/app/manifest.ts`，构建后生成 `/manifest.webmanifest`。
+- Manifest 配置应用名称、短名称、描述、启动路径、独立窗口模式、主题色和背景色。
+- 已新增纯文字 `Ledger` SVG 图标：
+  - `public/icons/ledger-icon-192.svg`
+  - `public/icons/ledger-icon-512.svg`
+- 已配置主题色 `#26251e`，并接入 Apple Web App metadata。
+- 已新增 `public/sw.js`，缓存图标、离线页和运行时静态资源。
+- 已新增 `public/offline.html`，离线导航时展示友好页面。
+- 已新增全局 PWA 客户端组件，自动注册 service worker。
+- 已实现顶部弱网/离线提示横条。
+
 ## 最近验证结果
 
 以下命令已通过：
@@ -139,6 +162,7 @@ pnpm build
 - `/`
 - `/analytics`
 - `/login`
+- `/manifest.webmanifest`
 - `/settings`
 - `/settings/category-tags`
 - `/settings/funding-sources`
@@ -150,12 +174,9 @@ pnpm build
 
 建议后续优先级：
 
-1. 在设置页接入退出登录按钮。
-2. 实现交易列表筛选：月份、收入/支出、资金渠道、分类标签。
-3. 实现 PWA 配置：manifest、图标、主题色、弱网提示。
-4. 配置 Vercel 部署与生产环境变量。
-5. 执行生产 Supabase migration 并完成部署验收。
-6. 根据需要优化交易列表滑动交互，例如点击其他项自动收起。
+1. 配置 Vercel 部署与生产环境变量。
+2. 执行生产 Supabase migration 并完成部署验收。
+3. 根据需要优化交易列表滑动交互，例如点击其他项自动收起。
 
 ## 下次对话建议开场
 
@@ -165,4 +186,4 @@ pnpm build
 
 如果继续按优先级推进，建议下一步实现：
 
-- 设置页退出登录按钮。
+- 配置 Vercel 部署与生产环境变量。

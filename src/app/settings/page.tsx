@@ -1,5 +1,6 @@
 import Link from "next/link"
 
+import { SignOutButton } from "@/app/settings/sign-out-button"
 import { getCurrentUserOrRedirect, getDefaultLedgerId } from "@/lib/ledger/queries"
 import { createSupabaseServerClient } from "@/lib/supabase/server"
 
@@ -31,6 +32,8 @@ export default async function SettingsPage() {
             description="管理收入和支出的分类标签。"
           />
         </div>
+
+        <SignOutButton />
       </section>
     </main>
   )

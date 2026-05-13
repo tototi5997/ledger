@@ -5,7 +5,7 @@ import Link from "next/link"
 
 import { loadTransactionsPage } from "@/app/transactions/actions"
 import { DeleteTransactionForm } from "@/app/transactions/new/transaction-form"
-import type { TransactionRow } from "@/app/transactions/types"
+import type { TransactionFilters, TransactionRow } from "@/app/transactions/types"
 import { Button } from "@/components/ui/button"
 
 const ACTION_WIDTH = 144
@@ -14,9 +14,11 @@ const OPEN_THRESHOLD = 48
 export function TransactionsList({
   initialTransactions,
   initialHasMore,
+  filters,
 }: {
   initialTransactions: TransactionRow[]
   initialHasMore: boolean
+  filters: TransactionFilters
 }) {
   const [transactions, setTransactions] = useState(initialTransactions)
   const [page, setPage] = useState(1)
@@ -28,7 +30,7 @@ export function TransactionsList({
     setMessage("")
     startTransition(async () => {
       try {
-        const result = await loadTransactionsPage(page)
+        const result = await loadTransactionsPage(page, filters)
         setTransactions((current) => [...current, ...result.transactions])
         setHasMore(result.hasMore)
         setPage((current) => current + 1)
