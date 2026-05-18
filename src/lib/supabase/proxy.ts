@@ -5,6 +5,10 @@ import { getSupabaseEnv } from "@/lib/env"
 import type { Database } from "@/types/database"
 
 export async function updateSession(request: NextRequest) {
+  if (isRouterPrefetch(request)) {
+    return NextResponse.next()
+  }
+
   const { supabaseUrl, supabaseAnonKey } = getSupabaseEnv()
   let response = NextResponse.next({ request })
 
@@ -43,4 +47,12 @@ export async function updateSession(request: NextRequest) {
   }
 
   return response
+}
+
+function isRouterPrefetch(request: NextRequest) {
+  return (
+    request.headers.get("next-router-prefetch") === "1" ||
+    request.headers.get("purpose") === "prefetch" ||
+    request.headers.get("sec-purpose") === "prefetch"
+  )
 }

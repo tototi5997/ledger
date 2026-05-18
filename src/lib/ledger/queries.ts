@@ -24,6 +24,21 @@ export async function getDefaultLedgerId(
     email?: string | null
   }
 ) {
+  const { data: existingLedger, error } = await supabase
+    .from("ledgers")
+    .select("id")
+    .eq("created_by", user.id)
+    .eq("is_default", true)
+    .maybeSingle()
+
+  if (error) {
+    throw error
+  }
+
+  if (existingLedger) {
+    return existingLedger.id
+  }
+
   return ensureUserWorkspace(supabase, {
     id: user.id,
     email: user.email,
