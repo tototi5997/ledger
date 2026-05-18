@@ -153,6 +153,9 @@
 - 已保留登录和注册后的幂等初始化，确保新用户仍会创建默认账本、默认资金渠道和默认分类标签。
 - 已在 Proxy 中跳过 Next.js 路由预取请求的 Supabase 鉴权，减少页面链接预取时的服务端请求开销。
 - 已新增全局 `loading.tsx`，并优化为包含导航、标题、统计卡片、列表和图表占位的骨架屏，动态页面切换时立即展示加载反馈。
+- 已为 `/transactions/[id]/edit` 新增就近 `loading.tsx`，点击交易编辑时先进入表单骨架屏，再等待服务端加载交易详情和表单选项。
+- 已为 `/transactions/new` 新增就近 `loading.tsx`，点击新增记账时先进入表单骨架屏，再等待服务端加载资金渠道和分类标签。
+- 已为 `/settings/funding-sources` 和 `/settings/category-tags` 新增就近 `loading.tsx`，进入管理页时先展示管理表单和列表骨架屏。
 
 ## 最近验证结果
 
