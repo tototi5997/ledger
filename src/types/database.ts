@@ -93,6 +93,44 @@ export type Database = {
         }
         Relationships: []
       }
+      funding_source_balance_snapshots: {
+        Row: {
+          id: string
+          ledger_id: string
+          funding_source_id: string
+          balance_amount: string
+          currency: string
+          snapshot_date: string
+          note: string | null
+          created_by: string
+          created_at: string
+          updated_at: string
+          deleted_at: string | null
+        }
+        Insert: {
+          id?: string
+          ledger_id: string
+          funding_source_id: string
+          balance_amount: string | number
+          currency?: string
+          snapshot_date: string
+          note?: string | null
+          created_by: string
+          created_at?: string
+          updated_at?: string
+          deleted_at?: string | null
+        }
+        Update: {
+          funding_source_id?: string
+          balance_amount?: string | number
+          currency?: string
+          snapshot_date?: string
+          note?: string | null
+          updated_at?: string
+          deleted_at?: string | null
+        }
+        Relationships: []
+      }
       category_tags: {
         Row: {
           id: string

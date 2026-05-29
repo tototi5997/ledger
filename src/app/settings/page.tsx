@@ -22,6 +22,11 @@ export default async function SettingsPage() {
 
         <div className="overflow-hidden rounded-3xl border bg-card">
           <SettingsLink
+            href="/assets"
+            title="资产总览"
+            description="设置资金渠道余额，查看总资产和变化趋势。"
+          />
+          <SettingsLink
             href="/settings/funding-sources"
             title="资金渠道"
             description="管理支付宝、微信、银行卡、现金等资金来源。"

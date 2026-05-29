@@ -3,11 +3,13 @@
 import { redirect } from "next/navigation"
 
 import { ensureUserWorkspace } from "@/lib/ledger/initialize"
+import { getAuthRedirectUrl } from "@/lib/auth/redirect-url"
 import { createSupabaseServerClient } from "@/lib/supabase/server"
 import { loginSchema, normalizeEmail, registerSchema } from "@/lib/validations/auth"
 
 export type AuthActionState = {
   message: string
+  status?: "idle" | "success"
 }
 
 const initialErrorMessage = "请求失败，请稍后重试"
@@ -26,18 +28,19 @@ export async function loginAction(
   }
 
   const supabase = await createSupabaseServerClient()
+  const email = normalizeEmail(parsed.data.email)
   const { data, error } = await supabase.auth.signInWithPassword({
-    email: normalizeEmail(parsed.data.email),
+    email,
     password: parsed.data.password,
   })
 
   if (error || !data.user) {
-    return { message: "邮箱或密码错误" }
+    return { message: getLoginErrorMessage(error?.message) }
   }
 
   await ensureUserWorkspace(supabase, {
     id: data.user.id,
-    email: data.user.email ?? normalizeEmail(parsed.data.email),
+    email: data.user.email ?? email,
   })
 
   redirect("/")
@@ -58,21 +61,25 @@ export async function registerAction(
   }
 
   const supabase = await createSupabaseServerClient()
-  const { data, error } = await supabase.auth.signUp({
-    email: normalizeEmail(parsed.data.email),
+  const email = normalizeEmail(parsed.data.email)
+  const { error } = await supabase.auth.signUp({
+    email,
     password: parsed.data.password,
+    options: {
+      emailRedirectTo: getAuthRedirectUrl("/auth/confirm?next=/"),
+    },
   })
 
-  if (error || !data.user) {
+  if (error) {
     return { message: error?.message ?? "注册失败，请稍后重试" }
   }
 
-  await ensureUserWorkspace(supabase, {
-    id: data.user.id,
-    email: data.user.email ?? normalizeEmail(parsed.data.email),
-  })
+  await supabase.auth.signOut()
 
-  redirect("/")
+  return {
+    status: "success",
+    message: `验证邮件已发送到 ${email}，请打开邮件中的链接完成注册。`,
+  }
 }
 
 export async function signOutAction(): Promise<AuthActionState> {
@@ -84,4 +91,12 @@ export async function signOutAction(): Promise<AuthActionState> {
   }
 
   redirect("/login")
+}
+
+function getLoginErrorMessage(message?: string) {
+  if (message?.toLowerCase().includes("email not confirmed")) {
+    return "请先打开验证邮件完成邮箱确认"
+  }
+
+  return "邮箱或密码错误"
 }

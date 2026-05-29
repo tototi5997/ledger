@@ -33,14 +33,16 @@ export async function updateSession(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname
   const isLoginPage = pathname === "/login"
+  const isAuthCallback = pathname.startsWith("/auth/")
+  const isForgotPasswordPage = pathname === "/forgot-password"
 
-  if (!user && !isLoginPage) {
+  if (!user && !isLoginPage && !isAuthCallback && !isForgotPasswordPage) {
     const url = request.nextUrl.clone()
     url.pathname = "/login"
     return NextResponse.redirect(url)
   }
 
-  if (user && isLoginPage) {
+  if (user && (isLoginPage || isForgotPasswordPage)) {
     const url = request.nextUrl.clone()
     url.pathname = "/"
     return NextResponse.redirect(url)

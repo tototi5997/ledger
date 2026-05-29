@@ -78,6 +78,9 @@ export default async function HomePage() {
       <section className="mx-auto flex w-full max-w-5xl flex-col gap-8">
         <header className="flex items-center justify-between">
           <nav className="flex items-center gap-4 text-sm text-muted-foreground">
+            <Link href="/assets" className="underline-offset-4 hover:underline">
+              资产
+            </Link>
             <Link href="/analytics" className="underline-offset-4 hover:underline">
               统计
             </Link>

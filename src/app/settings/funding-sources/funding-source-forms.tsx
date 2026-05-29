@@ -124,7 +124,7 @@ function ConfirmDeleteLayer({
         <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-muted sm:hidden" />
         <h2 className="text-lg font-semibold">确认删除资金渠道？</h2>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          将删除“{name}”。如果该资金渠道已经被交易使用，系统会阻止删除，你可以改为隐藏。
+          将删除“{name}”。如果该资金渠道已经被交易或资产余额记录使用，系统会阻止删除，你可以改为隐藏。
         </p>
         <form action={action} className="mt-5 grid grid-cols-2 gap-3">
           <input type="hidden" name="id" value={id} />

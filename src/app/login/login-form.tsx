@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useActionState, useState } from "react"
 import { useFormStatus } from "react-dom"
 
@@ -8,10 +9,12 @@ import { Button } from "@/components/ui/button"
 
 const initialState: AuthActionState = {
   message: "",
+  status: "idle",
 }
 
-export function LoginForm() {
+export function LoginForm({ reset, verified }: { reset?: string; verified?: string }) {
   const [mode, setMode] = useState<"login" | "register">("login")
+  const authNotice = getAuthNotice({ reset, verified })
 
   return (
     <div className="w-full max-w-md rounded-3xl border bg-card p-6 shadow-sm">
@@ -25,17 +28,34 @@ export function LoginForm() {
         </p>
       </div>
 
+      {authNotice ? (
+        <p className={authNotice.className}>
+          {authNotice.message}
+        </p>
+      ) : null}
+
       {mode === "login" ? <LoginFields /> : <RegisterFields />}
 
-      <div className="mt-6 border-t pt-5 text-center text-sm text-muted-foreground">
-        {mode === "login" ? "还没有邮箱账号？" : "已经有邮箱账号？"}
-        <button
-          type="button"
-          className="ml-2 font-medium text-foreground underline-offset-4 hover:underline"
-          onClick={() => setMode(mode === "login" ? "register" : "login")}
-        >
-          {mode === "login" ? "注册" : "登录"}
-        </button>
+      <div className="mt-6 space-y-3 border-t pt-5 text-center text-sm text-muted-foreground">
+        {mode === "login" ? (
+          <Link
+            href="/forgot-password"
+            className="font-medium text-foreground underline-offset-4 hover:underline"
+          >
+            忘记密码？
+          </Link>
+        ) : null}
+
+        <div>
+          {mode === "login" ? "还没有邮箱账号？" : "已经有邮箱账号？"}
+          <button
+            type="button"
+            className="ml-2 font-medium text-foreground underline-offset-4 hover:underline"
+            onClick={() => setMode(mode === "login" ? "register" : "login")}
+          >
+            {mode === "login" ? "注册" : "登录"}
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -107,7 +127,11 @@ function AuthForm({
       ) : null}
 
       {message ? (
-        <p className="rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        <p
+          className={
+            stateClassName(message, mode)
+          }
+        >
           {message}
         </p>
       ) : null}
@@ -115,6 +139,14 @@ function AuthForm({
       <SubmitButton mode={mode} />
     </form>
   )
+}
+
+function stateClassName(message: string, mode: "login" | "register") {
+  if (mode === "register" && message.includes("验证邮件已发送")) {
+    return "rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700"
+  }
+
+  return "rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive"
 }
 
 function SubmitButton({ mode }: { mode: "login" | "register" }) {
@@ -125,4 +157,42 @@ function SubmitButton({ mode }: { mode: "login" | "register" }) {
       {pending ? "处理中..." : mode === "login" ? "登录" : "注册"}
     </Button>
   )
+}
+
+function getAuthNotice({
+  reset,
+  verified,
+}: {
+  reset?: string
+  verified?: string
+}) {
+  if (reset === "1") {
+    return {
+      message: "密码已重设，请使用新密码登录。",
+      className: "mb-4 rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700",
+    }
+  }
+
+  if (reset === "0") {
+    return {
+      message: "密码重设链接无效或已过期，请重新发送重设邮件。",
+      className: "mb-4 rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive",
+    }
+  }
+
+  if (verified === "1") {
+    return {
+      message: "邮箱验证成功，请登录。",
+      className: "mb-4 rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700",
+    }
+  }
+
+  if (verified === "0") {
+    return {
+      message: "邮箱验证链接无效或已过期，请重新注册或重新发送验证邮件。",
+      className: "mb-4 rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive",
+    }
+  }
+
+  return null
 }

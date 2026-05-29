@@ -37,7 +37,8 @@
 - 每笔交易必须选择一个资金渠道。
 - 每笔交易必须且只能选择一个分类标签。
 - 资金渠道和分类标签均支持用户自定义。
-- 不做账户余额管理。
+- MVP 不做账户余额管理；MVP 后通过资金渠道余额快照实现资产管理。
+- 资产管理第一版不做资金渠道间转账、负债账户和多币种折算。
 - 不做预算管理。
 - 不做多人协作、分账和成员结算。
 
@@ -50,11 +51,15 @@
 | 路由 | 页面 | 说明 |
 | --- | --- | --- |
 | `/login` | 登录页 | 邮箱 + 密码登录和注册 |
+| `/forgot-password` | 找回密码页 | 输入邮箱并发送密码重设邮件 |
+| `/reset-password` | 设置新密码页 | 用户从邮件链接进入后设置新密码 |
+| `/auth/confirm` | Auth 邮件回调 | 处理 Supabase 邮箱验证和密码重设链接 |
 | `/` | 首页仪表盘 | 展示本月收入、支出、结余、最近交易和快捷入口 |
 | `/transactions` | 交易列表页 | 支持按月份、类型、资金渠道、分类标签筛选 |
 | `/transactions/new` | 新增交易页 | 按固定流程新增收入或支出 |
 | `/transactions/[id]/edit` | 编辑交易页 | 编辑已有交易 |
 | `/analytics` | 统计页 | 展示月度、资金渠道、分类标签和趋势统计 |
+| `/assets` | 资产页 | 展示总资产、资金渠道余额和资产趋势 |
 | `/settings` | 设置页 | 个人资料、账本信息、默认币种和退出登录 |
 | `/settings/funding-sources` | 资金渠道管理页 | 新增、编辑、隐藏、删除未使用资金渠道 |
 | `/settings/category-tags` | 分类标签管理页 | 按收入/支出筛选，新增、编辑、隐藏、删除分类标签 |
@@ -62,7 +67,10 @@
 ### 2.2 页面访问控制
 
 - `/login` 仅用于未登录用户。
-- 登录后访问 `/login`，自动跳转到 `/`。
+- `/forgot-password` 仅用于未登录用户。
+- `/reset-password` 仅允许携带有效密码重设 session 和短时 recovery 标记的用户访问。
+- `/auth/*` 用于 Supabase Auth 邮件回调，未登录状态也必须允许访问。
+- 登录后访问 `/login` 或 `/forgot-password`，自动跳转到 `/`。
 - 未登录用户访问业务页面，自动跳转到 `/login`。
 - 所有业务页面必须基于当前 Supabase session 获取用户信息。
 
@@ -73,6 +81,7 @@
 - `/`
 - `/transactions`
 - `/analytics`
+- `/assets`
 - `/settings`
 - `/settings/funding-sources`
 - `/settings/category-tags`
@@ -85,10 +94,13 @@
 
 - 邮箱 + 密码登录表单。
 - 邮箱 + 密码注册表单。
+- 找回密码表单。
+- 设置新密码表单。
 - 新增或编辑交易表单。
 - 交易筛选器。
 - 资金渠道新增或编辑表单。
 - 分类标签新增或编辑表单。
+- 资金渠道余额设置或校准表单。
 - 删除、隐藏、退出登录等需要用户确认的交互组件。
 - 图表组件，如使用 Recharts 等依赖浏览器 API 的库。
 
@@ -127,9 +139,11 @@
 - 资金渠道和分类标签支持隐藏。
 - 资金渠道不直接硬删除已被交易引用的数据。
 - 分类标签删除时，如果已有交易引用，需要先迁移交易到同类型“其他”标签。
-- 未被交易引用的资金渠道允许删除。
+- 未被交易和有效余额快照引用的资金渠道允许删除。
 - 每个用户的默认账本初始化一份自己的资金渠道和分类标签。
 - 不使用全局共享的系统默认渠道或标签，避免用户隐藏、编辑默认项时需要额外覆盖表。
+- 资产管理使用余额快照表保存校准点，不在 `funding_sources` 上冗余保存当前余额。
+- 余额快照不参与收入、支出和月度结余统计。
 
 ### 3.2 profiles
 
@@ -270,6 +284,36 @@
 - `amount > 0`。
 - `category_tag_id` 对应标签类型必须与交易 `type` 一致。该规则建议通过写入逻辑和数据库触发器双重保证。
 
+### 3.7 funding_source_balance_snapshots
+
+资金渠道余额快照表。每条记录表示某个资金渠道在某个自然日结束后的实际余额，用于资产余额和资产趋势计算。
+
+| 字段 | 类型 | 约束 | 说明 |
+| --- | --- | --- | --- |
+| id | uuid | primary key, default gen_random_uuid() | 余额快照 ID |
+| ledger_id | uuid | not null, references ledgers(id) | 账本 ID |
+| funding_source_id | uuid | not null, references funding_sources(id) | 资金渠道 ID |
+| balance_amount | numeric(12,2) | not null | 快照日期结束后的渠道余额 |
+| currency | text | not null, default 'CNY' | 币种，第一版跟随账本默认币种 |
+| snapshot_date | date | not null | 快照日期 |
+| note | text | nullable | 校准备注 |
+| created_by | uuid | not null, references auth.users(id) | 创建人 |
+| created_at | timestamptz | not null, default now() | 创建时间 |
+| updated_at | timestamptz | not null, default now() | 更新时间 |
+| deleted_at | timestamptz | nullable | 软删除时间 |
+
+建议约束：
+
+- `balance_amount >= 0`。
+- `funding_source_id` 必须属于同一 `ledger_id`。
+- 同一资金渠道同一快照日期最多一条有效快照：`unique (funding_source_id, snapshot_date) where deleted_at is null`。
+- `snapshot_date <= current_date` 的未来日期限制由服务端校验完成；数据库可通过触发器补充。
+
+建议索引：
+
+- `(ledger_id, funding_source_id, snapshot_date desc) where deleted_at is null`，用于查找最近快照。
+- `(ledger_id, snapshot_date desc) where deleted_at is null`，用于资产页和趋势查询。
+
 ## 4. RLS 权限策略
 
 ### 4.1 权限原则
@@ -278,6 +322,7 @@
 - 用户只能访问自己的 `profiles` 记录。
 - 用户只能访问 `created_by = auth.uid()` 的账本。
 - 用户只能访问自己账本下的资金渠道、分类标签和交易。
+- 用户只能访问自己账本下的余额快照。
 - 前端不能依赖隐藏字段做权限判断，权限必须由 Supabase RLS 兜底。
 - 服务端写操作也必须使用当前用户上下文，不能用 service role 绕过普通业务权限。
 
@@ -389,7 +434,29 @@
 
 - MVP 不提供硬删除交易能力。
 
-### 4.7 业务校验与 RLS 的边界
+### 4.7 funding_source_balance_snapshots 策略
+
+读取：
+
+- 用户只能读取所属账本 `created_by = auth.uid()` 的余额快照。
+- 默认查询应过滤 `deleted_at is null`。
+
+新增：
+
+- 用户只能在自己的账本下创建余额快照。
+- `created_by` 必须等于 `auth.uid()`。
+- `funding_source_id` 必须属于同一账本。
+
+更新：
+
+- 用户只能更新自己账本下的余额快照。
+- 重复设置同一资金渠道同一日期余额时，优先更新已有有效快照。
+
+删除：
+
+- 余额快照默认使用软删除，通过设置 `deleted_at` 实现。
+
+### 4.8 业务校验与 RLS 的边界
 
 RLS 负责数据归属隔离，以下业务规则由 Server Actions 或数据库约束补充：
 
@@ -398,6 +465,9 @@ RLS 负责数据归属隔离，以下业务规则由 Server Actions 或数据库
 - 分类标签类型必须与交易类型一致。
 - 资金渠道和分类标签必须属于同一个账本。
 - 隐藏的资金渠道和分类标签不应出现在新增交易选项中，但历史交易仍可读取。
+- 余额快照金额必须大于或等于 0。
+- 余额快照日期不能晚于当前日期。
+- 余额快照的资金渠道必须属于当前用户账本。
 
 ## 5. Auth 登录方案
 
@@ -406,6 +476,8 @@ RLS 负责数据归属隔离，以下业务规则由 Server Actions 或数据库
 - 使用邮箱 + 密码作为用户登录方式。
 - 用户注册时使用邮箱作为账号。
 - 用户注册时自定义密码。
+- 用户注册后必须通过邮箱验证链接确认邮箱。
+- 用户忘记密码时可通过注册邮箱接收重设链接并设置新密码。
 - MVP 不使用手机号登录。
 - MVP 不接入短信服务商。
 - Supabase Auth 使用邮箱 + 密码能力承载登录。
@@ -413,6 +485,7 @@ RLS 负责数据归属隔离，以下业务规则由 Server Actions 或数据库
 参考依据：
 
 - Supabase Auth 支持邮箱 + 密码注册和登录。
+- Supabase Auth 支持 `resetPasswordForEmail` 和 `updateUser({ password })` 完成密码重设。
 
 ### 5.2 邮箱格式
 
@@ -428,10 +501,15 @@ RLS 负责数据归属隔离，以下业务规则由 Server Actions 或数据库
 2. 用户输入密码。
 3. 用户确认密码。
 4. 前端校验邮箱格式和密码强度。
-5. 调用 Supabase `signUp({ email, password })`。
-6. 注册成功后创建或补全 `profiles`。
-7. 初始化默认账本、资金渠道和分类标签。
-8. 跳转到首页 `/`。
+5. 调用 Supabase `signUp({ email, password, options: { emailRedirectTo } })`。
+6. `emailRedirectTo` 指向 `/auth/confirm?next=/`。
+7. 注册成功后停留在登录页并提示用户查收验证邮件。
+8. 注册接口如果返回 session，应用侧主动 `signOut()`，避免未验证用户进入业务页面。
+9. 用户点击邮件链接后进入 `/auth/confirm`。
+10. `/auth/confirm` 使用 `verifyOtp({ token_hash, type })` 换取 session。
+11. 邮箱确认成功后创建或补全 `profiles`。
+12. 初始化默认账本、资金渠道和分类标签。
+13. 跳转到首页 `/`。
 
 密码要求：
 
@@ -446,34 +524,72 @@ RLS 负责数据归属隔离，以下业务规则由 Server Actions 或数据库
 1. 用户输入邮箱。
 2. 用户输入密码。
 3. 调用 Supabase `signInWithPassword({ email, password })`。
-4. 登录成功后检查默认账本是否存在。
-5. 如果默认账本不存在，则执行幂等初始化。
-6. 跳转到首页 `/`。
+4. 如果 Supabase 返回邮箱未确认错误，则提示用户先完成邮箱验证。
+5. 登录成功后检查默认账本是否存在。
+6. 如果默认账本不存在，则执行幂等初始化。
+7. 跳转到首页 `/`。
 
 ### 5.5 Session 管理
 
 - 使用 Supabase SSR 方案在 Next.js App Router 中管理 session。
 - Proxy 负责保护业务路由。
+- Proxy 必须放行 `/auth/*`，否则未登录用户无法打开邮箱验证链接。
 - Server Components 通过服务端 Supabase client 获取当前用户。
 - Client Components 仅处理登录、注册、退出等交互。
 
-### 5.6 退出登录
+### 5.6 邮箱确认回调
+
+路径：`/auth/confirm`
+
+查询参数：
+
+- `token_hash`：Supabase 邮件模板提供的 token hash。
+- `type`：邮箱验证类型，注册确认使用 `email`，密码重设使用 `recovery`。
+- `next`：验证成功后的站内跳转路径，必须限制为相对路径。
+
+处理规则：
+
+- 缺少参数、验证失败或链接过期时跳转 `/login?verified=0`。
+- 注册邮箱验证成功后执行用户空间幂等初始化。
+- 密码重设验证成功后设置 10 分钟有效的服务端 recovery 标记，并跳转 `/reset-password`。
+- 默认跳转 `/`。
+- 如果 `next=/login`，则跳转 `/login?verified=1`。
+
+### 5.7 退出登录
 
 - 用户在设置页点击退出登录。
 - 调用 Supabase `signOut()`。
 - 清理本地 session 后跳转到 `/login`。
 
-### 5.7 密码找回
+### 5.8 密码找回
 
-MVP 暂不实现密码找回。
+路径：
 
-原因：
+- `/forgot-password`
+- `/reset-password`
 
-- 密码找回需要配置邮件模板和站点跳转地址。
+流程：
 
-MVP 替代方案：
+1. 用户在登录页点击“忘记密码？”。
+2. 用户在 `/forgot-password` 输入邮箱。
+3. 服务端校验邮箱格式并调用 Supabase `resetPasswordForEmail(email, { redirectTo })`。
+4. `redirectTo` 指向 `/auth/confirm?next=/reset-password`。
+5. 发送成功后统一提示“如果该邮箱已注册，我们会发送一封密码重设邮件”，避免泄露账号是否存在。
+6. 用户点击密码重设邮件链接后进入 `/auth/confirm`。
+7. `/auth/confirm` 使用 `verifyOtp({ token_hash, type: "recovery" })` 换取临时 session。
+8. 回调成功后设置 `ledger_password_recovery` 短时 HttpOnly cookie，并跳转 `/reset-password`。
+9. `/reset-password` 要求同时存在有效 Supabase session 和 recovery cookie。
+10. 用户输入新密码和确认密码。
+11. 服务端校验密码强度和两次密码一致性。
+12. 调用 Supabase `updateUser({ password })` 更新密码。
+13. 更新成功后清理 recovery cookie 和当前 session，跳转 `/login?reset=1`。
 
-- 开发或个人部署阶段可通过 Supabase 控制台手动重置用户密码。
+安全规则：
+
+- `/forgot-password` 未登录可访问，已登录访问会跳转首页。
+- `/reset-password` 不能作为普通修改密码入口使用，缺少 recovery cookie 时跳转 `/login?reset=0`。
+- 密码重设链接失效或验证失败时跳转 `/login?reset=0`。
+- recovery cookie 有效期 10 分钟，仅限 `/reset-password` 路径。
 
 ## 6. PWA 配置方案
 
@@ -590,7 +706,49 @@ MVP 统计逻辑由 Next.js 服务端完成。
 - 查询范围默认使用当前自然月。
 - 统计页允许切换月份。
 
-### 7.4 初始化逻辑
+### 7.4 资产余额计算
+
+资产管理逻辑由 Next.js 服务端完成，优先服务端聚合后传给 Server Component 或图表 Client Component。
+
+原则：
+
+- 不在浏览器端拉取全量交易和全量快照再计算资产。
+- 不在 `funding_sources` 表保存可变的当前余额，避免交易编辑、软删除和历史回溯导致余额失真。
+- 第一版暂不使用 materialized view；如果交易量明显增大，可改为 Supabase RPC 或按日资产快照缓存。
+- 资产余额只用于资产页，不改变收入、支出和月度结余统计口径。
+
+当前余额计算：
+
+1. 对每个资金渠道查找目标日期当天或之前最近一条有效余额快照。
+2. 如果不存在有效快照，该资金渠道显示为“未设置”，不纳入总资产。
+3. 汇总快照日期之后、目标日期当天或之前的有效交易。
+4. `income` 累加到该资金渠道余额。
+5. `expense` 从该资金渠道余额扣减。
+6. 总资产为所有可计算资金渠道余额之和。
+
+趋势计算：
+
+- 默认展示最近 30 天每日结束时总资产。
+- 可扩展支持本月、近 3 个月。
+- 每个日期点按该日期当天或之前的最近快照计算。
+- 如果某资金渠道在某日期点之前没有快照，则该渠道在该日期点不参与总资产。
+- 已软删除交易和已软删除余额快照不参与计算。
+
+余额校准写入：
+
+- 通过 Server Action 提交。
+- 表单字段：资金渠道、余额、快照日期、备注。
+- 前端和服务端都用 Zod 校验余额金额、日期和资金渠道。
+- 同一资金渠道同一日期已有有效快照时更新原记录，否则新增记录。
+- 校准成功后 `revalidatePath('/assets')`，并根据需要刷新首页或统计入口。
+
+资金渠道隐藏和删除影响：
+
+- 已隐藏资金渠道如果存在余额快照或历史交易，资产页仍应展示历史名称和余额。
+- 删除资金渠道前需要同时检查交易引用和有效余额快照引用。
+- 如果资金渠道已有余额快照，即使没有交易引用，也不允许硬删除，应提示改为隐藏或先删除误录快照。
+
+### 7.5 初始化逻辑
 
 用户登录或注册成功后执行幂等初始化：
 
@@ -601,22 +759,25 @@ MVP 统计逻辑由 Next.js 服务端完成。
 
 初始化逻辑必须可以重复执行，重复执行不得产生重复数据。
 
-### 7.5 隐藏逻辑
+### 7.6 隐藏逻辑
 
 - 资金渠道隐藏时设置 `hidden_at`。
 - 分类标签隐藏时设置 `hidden_at`。
 - 新增和编辑交易时默认只展示 `hidden_at is null` 的渠道和标签。
 - 历史交易详情和统计仍应能展示隐藏渠道和隐藏标签名称。
+- 资产页仍应展示已隐藏但有余额快照或历史交易的资金渠道。
 
-### 7.6 资金渠道删除逻辑
+### 7.7 资金渠道删除逻辑
 
 - 删除资金渠道前，先查询当前账本下是否存在使用该 `funding_source_id` 的交易。
+- 删除资金渠道前，还必须查询当前账本下是否存在该 `funding_source_id` 的有效余额快照。
 - 点击删除后必须二次确认；移动端使用底部弹层，桌面端使用居中模态框。
 - 如果存在交易引用，则阻止删除，提示“该资金渠道已被交易使用，无法删除，可选择隐藏”。
-- 如果不存在交易引用，则允许删除该资金渠道。
+- 如果存在余额快照引用，则阻止删除，提示“该资金渠道已有资产余额记录，无法删除，可选择隐藏”。
+- 如果不存在交易引用和有效余额快照引用，则允许删除该资金渠道。
 - 删除操作必须限定在当前用户自己的默认账本内。
 
-### 7.7 分类标签删除逻辑
+### 7.8 分类标签删除逻辑
 
 - 删除分类标签前，先读取待删除标签的 `type`。
 - 根据 `type` 查找同账本下同类型、名称为“其他”的分类标签。
@@ -648,18 +809,21 @@ Vercel 环境变量需要分别配置 Production 和 Preview。
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 NEXT_PUBLIC_SITE_URL=
+DATABASE_URL=
 ```
 
 可选服务端变量：
 
 ```env
 SUPABASE_SERVICE_ROLE_KEY=
+DIRECT_URL=
 ```
 
 使用原则：
 
 - `NEXT_PUBLIC_SUPABASE_URL` 可暴露到浏览器。
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` 可暴露到浏览器，但必须配合 RLS 使用。
+- `DATABASE_URL` 或 `DIRECT_URL` 用于 `pnpm db:migrate` 执行数据库 migration，必须是 Postgres 连接串，不能使用 anon key 代替。
 - `SUPABASE_SERVICE_ROLE_KEY` 只能在服务端使用。
 - 普通业务读写不应使用 service role key 绕过 RLS。
 - 如果 MVP 不需要管理型后台任务，可以暂不配置 service role key。
@@ -682,6 +846,14 @@ supabase/
   migrations/
 ```
 
+本地执行方式：
+
+- `pnpm db:migrate` 会按文件名顺序执行 `supabase/migrations/*.sql`。
+- 脚本会维护 `public.schema_migrations` 表，只执行未记录的 migration。
+- `pnpm dev` 会先执行 `pnpm db:migrate`，再启动 Next.js 开发服务器。
+- 如果数据库曾经手动执行过早期 migration，脚本会在首次运行时接管已存在的核心 migration 记录。
+- 缺少 `DATABASE_URL` 或 `DIRECT_URL` 时，`pnpm db:migrate` 会失败并提示补充连接串，避免应用在 schema 缺失时启动。
+
 ### 8.4 发布流程
 
 推荐流程：
@@ -701,7 +873,10 @@ supabase/
 - Production 和 Preview 应使用不同 Supabase 项目或至少不同数据库环境，避免测试数据污染生产。
 - Auth 配置中的 Site URL 需要指向生产域名。
 - Redirect URL 需要包含 Vercel Preview 域名模式或指定预览域名。
-- 由于 MVP 使用邮箱 + 密码，Supabase Auth 需要启用邮箱登录。开发阶段可关闭必须邮箱确认的要求。
+- Redirect URL 需要允许 `/auth/confirm`。
+- Supabase Auth 需要启用邮箱登录和邮箱确认。
+- 注册确认邮件模板建议使用 PKCE/SSR token hash 链接：`{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email&next=/`。
+- 密码重设邮件模板建议使用 PKCE/SSR token hash 链接：`{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/reset-password`。
 
 ## 9. 测试与验收
 
@@ -715,6 +890,7 @@ MVP 测试重点覆盖：
 - 统计计算。
 - PWA 基础能力。
 - 部署环境。
+- MVP 后资产管理测试覆盖余额快照、资产计算和资产权限。
 
 ### 9.2 表单校验测试
 
@@ -724,11 +900,20 @@ MVP 测试重点覆盖：
 - 邮箱格式不正确时不能提交。
 - 密码为空时不能提交。
 - 密码不满足强度要求时不能注册。
+- 找回密码邮箱为空或格式错误时不能提交。
+- 找回密码提交成功后不暴露邮箱是否存在。
+- 设置新密码时两次密码必须一致。
+- 没有有效密码重设 session 时不能访问 `/reset-password`。
+- 注册成功后展示查收验证邮件提示。
+- 未验证邮箱登录时展示邮箱确认提示。
 - 金额为空时不能提交。
 - 金额小于或等于 0 时不能提交。
 - 未选择资金渠道时不能提交。
 - 未选择分类标签时不能提交。
 - 备注为空时允许提交。
+- 余额快照金额为空时不能提交。
+- 余额快照金额小于 0 时不能提交。
+- 余额快照日期晚于当前日期时不能提交。
 
 ### 9.3 RLS 权限测试
 
@@ -741,6 +926,7 @@ MVP 测试重点覆盖：
 - 用户 A 不能读取用户 B 的交易。
 - 用户 A 不能在用户 B 的账本下创建交易。
 - 用户 A 不能更新、隐藏或删除用户 B 的资金渠道和分类标签。
+- 用户 A 不能读取、创建、更新或软删除用户 B 的余额快照。
 
 ### 9.4 业务规则测试
 
@@ -750,15 +936,19 @@ MVP 测试重点覆盖：
 - 新用户首次登录后会自动创建默认资金渠道。
 - 新用户首次登录后会自动创建默认收入和支出分类标签。
 - 初始化逻辑重复执行不会创建重复数据。
+- 未验证邮箱用户不会进入业务页面。
+- 邮箱确认成功后会自动初始化默认账本、默认资金渠道和默认分类标签。
 - 收入交易只能选择收入类型分类标签。
 - 支出交易只能选择支出类型分类标签。
 - 每笔交易只能关联一个分类标签。
 - 隐藏资金渠道后，新增交易默认选项不再展示该渠道。
 - 未被交易使用的资金渠道可以删除。
 - 已被交易使用的资金渠道不能删除，只能隐藏。
+- 已有有效余额快照的资金渠道不能删除，只能隐藏或先删除误录快照。
 - 隐藏分类标签后，新增交易默认选项不再展示该标签。
 - 历史交易仍能显示被隐藏的资金渠道和分类标签。
 - 软删除交易后，该交易不再出现在默认列表和统计中。
+- 余额快照重复设置同一资金渠道同一日期时更新原有效快照。
 
 ### 9.5 统计测试
 
@@ -773,7 +963,22 @@ MVP 测试重点覆盖：
 - 已软删除交易不参与统计。
 - 切换月份后统计范围正确。
 
-### 9.6 PWA 验收
+### 9.6 资产管理测试
+
+需要验证：
+
+- 未设置余额快照的资金渠道显示为“未设置”，不纳入总资产。
+- 设置初始余额后，资产页显示对应资金渠道余额。
+- 新增收入后，对应资金渠道余额增加。
+- 新增支出后，对应资金渠道余额减少。
+- 编辑交易金额、类型、日期或资金渠道后，资产余额重新计算。
+- 软删除交易后，该交易不参与资产余额和趋势计算。
+- 重新校准余额后，以最新快照作为后续资产计算起点。
+- 余额快照不影响收入、支出和月度结余统计。
+- 已隐藏但有快照或历史交易的资金渠道仍能在资产页展示。
+- 已软删除余额快照不参与资产余额和趋势计算。
+
+### 9.7 PWA 验收
 
 需要验证：
 
@@ -784,7 +989,7 @@ MVP 测试重点覆盖：
 - 弱网或离线时展示提示。
 - 离线状态下不会误导用户以为交易已提交成功。
 
-### 9.7 部署验收
+### 9.8 部署验收
 
 需要验证：
 
@@ -794,6 +999,7 @@ MVP 测试重点覆盖：
 - RLS 在部署环境生效。
 - migration 已正确应用到目标 Supabase 环境。
 - 邮箱 + 密码注册和登录在部署环境可用。
+- 邮箱验证链接在部署环境可正常回调 `/auth/confirm`。
 
 ## 10. 开发任务拆分
 
@@ -814,6 +1020,7 @@ MVP 测试重点覆盖：
 11. 实现统计页。
 12. 实现 PWA 基础能力。
 13. 执行权限、统计、PWA 和部署验收。
+14. MVP 后实现资产管理基础版。
 
 ### 10.2 任务细分
 
@@ -834,6 +1041,7 @@ MVP 测试重点覆盖：
 - 创建 `funding_sources` migration。
 - 创建 `category_tags` migration。
 - 创建 `transactions` migration。
+- MVP 后创建 `funding_source_balance_snapshots` migration。
 - 创建必要索引和约束。
 - 创建 RLS policies。
 - 验证用户间数据隔离。
@@ -841,7 +1049,9 @@ MVP 测试重点覆盖：
 #### 阶段 3：认证与初始化
 
 - 实现邮箱 + 密码注册。
+- 实现邮箱验证回调。
 - 实现邮箱 + 密码登录。
+- 实现邮箱密码找回。
 - 实现退出登录。
 - 实现邮箱格式规范化。
 - 实现 session middleware。
@@ -893,6 +1103,17 @@ MVP 测试重点覆盖：
 - 应用 migration。
 - 完成 Production 部署验收。
 
+#### 阶段 8：资产管理基础版
+
+- 创建余额快照表、索引、约束和 RLS policy。
+- 实现余额快照 Zod schema。
+- 实现资金渠道余额设置和校准 Server Action。
+- 实现资产余额服务端聚合函数。
+- 实现资产页 `/assets`。
+- 实现总资产趋势图。
+- 调整资金渠道删除逻辑，删除前检查有效余额快照。
+- 补充资产管理权限、校验和计算测试。
+
 ### 10.3 MVP 完成标准
 
 满足以下条件后，MVP 可视为完成：
@@ -905,3 +1126,15 @@ MVP 测试重点覆盖：
 - 用户只能访问自己的账本数据。
 - PWA 可以添加到手机主屏幕。
 - 应用可以通过 Vercel Production 正常访问。
+
+### 10.4 资产管理基础版完成标准
+
+满足以下条件后，资产管理基础版可视为完成：
+
+- 用户可以为资金渠道设置初始余额。
+- 用户可以重新校准资金渠道余额。
+- 用户可以查看总资产、资金渠道余额、本月净变化和资产趋势。
+- 资产余额随交易新增、编辑和软删除自动重算。
+- 余额快照不影响收入、支出和月度结余统计。
+- 资金渠道删除逻辑会检查有效余额快照。
+- RLS 阻止用户访问其他用户的余额快照。

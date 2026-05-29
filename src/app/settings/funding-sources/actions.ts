@@ -148,6 +148,21 @@ export async function deleteFundingSourceAction(
     return { message: "该资金渠道已被交易使用，无法删除，可选择隐藏" }
   }
 
+  const { count: snapshotCount, error: snapshotCountError } = await supabase
+    .from("funding_source_balance_snapshots")
+    .select("id", { count: "exact", head: true })
+    .eq("ledger_id", ledgerId)
+    .eq("funding_source_id", parsed.data)
+    .is("deleted_at", null)
+
+  if (snapshotCountError) {
+    return { message: snapshotCountError.message || fallbackMessage }
+  }
+
+  if ((snapshotCount ?? 0) > 0) {
+    return { message: "该资金渠道已有资产余额记录，无法删除，可选择隐藏" }
+  }
+
   const { error } = await supabase
     .from("funding_sources")
     .delete()
@@ -164,6 +179,8 @@ export async function deleteFundingSourceAction(
 }
 
 function revalidateFundingSourcePages() {
+  revalidatePath("/")
+  revalidatePath("/assets")
   revalidatePath("/settings")
   revalidatePath("/settings/funding-sources")
   revalidatePath("/transactions/new")
